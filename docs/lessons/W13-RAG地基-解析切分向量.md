@@ -268,7 +268,7 @@ size 与 overlap 的影响**方向**（先验，数值你自己明天之前跑�
 
 **代码**
 
-```python
+````python
 """chunker.py — 三档切分同接口，方便后面做参数对比。"""
 from __future__ import annotations
 
@@ -382,7 +382,7 @@ if __name__ == "__main__":
         "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8")
     for r in rows[:6]:
         print(r)
-```
+````
 
 **今天的动作**
 

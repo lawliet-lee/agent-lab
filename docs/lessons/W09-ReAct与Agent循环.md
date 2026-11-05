@@ -90,7 +90,7 @@ Thought: I know the answer now.   Final Answer: ...
 **今天的动作不是把解析做多优雅，而是把失败计数打开**：每次解析失败记一行（原因分类 + 原始文本），跑 10 个问题后你会拿到一张脆弱性账单——这就是周三对比表的左半边。
 
 **代码**：`experiments/w09/react_text.py` 核心解析器（Python 3.12）：
-```python
+````python
 import json, re
 from dataclasses import dataclass
 from typing import Any
@@ -125,7 +125,7 @@ def parse_react_turn(text: str) -> ParsedStep:
         return ParsedStep("invalid", error=f"bad_json:{e.msg}", tool=am.group(1))
     return ParsedStep("action", tool=am.group(1),
                       args=args if isinstance(args, dict) else {"query": args})
-```
+````
 
 循环骨架（今天先跑通一个工具就够，比如 `search` 用 W06 的假实现）：`messages` 里不断追加模型输出、`Observation: <...>` 字符串，`while step_idx < MAX_STEPS`，解析 invalid 时**把失败原因原文回喂**（"你的输出不符合协议，请重新输出，注意 Action Input 必须是单行 JSON"）。**硬性习惯：`MAX_STEPS` 上限（建议 8）和单次运行的 token 累计上限（超了就 break 并标记 `terminated_by="budget"`），没有上限的循环等于给账单开了无护栏口子。**
 

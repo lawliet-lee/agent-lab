@@ -415,7 +415,6 @@ app = b.compile(checkpointer=saver)
 | 节点重跑 | resume 时所在节点从头执行 | 副作用必须在 interrupt 之后 |
 | stream_mode | updates/values/messages 等产出粒度 | 两种流混学是困惑之源 |
 | time travel | 从历史 checkpoint 分支重执行 | W19 断点续跑的现成能力 |
-| 大节点反模式 | 一个节点塞整个循环 | 退回手写还多付抽象层 |
-| get_state / get_state_history | 读当前快照/全部历史快照 | 调试框架行为的第一工具 |
+| 大节点反模式 | 一个节点塞整个循环 | 退回手写还多付抽象层；调试第一工具是 get_state(_history) |
 
 **延伸阅读（可选）**：官方 docs 的 "Why LangGraph" / durability 概念页各扫一遍（通勤），只带一个问题读：它还给了哪些我今天没用到的能力（并行分支、子图）——记两个名字即可，W17 多智能体会用到。
