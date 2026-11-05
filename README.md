@@ -62,13 +62,26 @@ agent-lab/
 | W02 | [Python 工程能力](docs/lessons/W02-Python工程能力.md) | httpx / pydantic / asyncio / 配置 / pytest | 第一个真实模型调用 |
 | W03 | [LLM API 的本质](docs/lessons/W03-LLM-API的本质.md) | 消息结构 / token / 流式 / 裁剪 | `llm_lab.py` |
 | W04 | [清账周](docs/lessons/W04-清账周-阶段0收口.md) | 补欠账 + 阶段自检 | `src/llm/` 定型 |
-| W05–W08 | 提示工程与工具调用 | Prompt / Function Calling / 上下文工程 | `agent_loop.py` |
-| W09–W12 | Agent 核心与项目一 | ReAct / LangGraph / 项目一 | 可试用的项目一 |
-| W13–W16 | RAG 与记忆 | 切分 / 混合检索 / rerank / 记忆分层 | 检索质量对比表 |
-| W17–W20 | 多智能体与 MCP | supervisor / MCP server / 长任务可靠性 | 项目二 |
-| W21–W24 | 评估、部署与出手 | 评测集 / trace / 公网部署 / 作品集 | URL + 技术文 + 投递材料 |
-
-（W05 起的讲义文件按周陆续落在 `docs/lessons/`。）
+| W05 | [Prompt 与结构化输出](docs/lessons/W05-Prompt与结构化输出.md) | 五要素 / few-shot / 输出契约 | 可校验的输出 |
+| W06 | [Function Calling](docs/lessons/W06-Function-Calling.md) | 工具定义 / 循环 / 写操作安全 | `agent_loop.py` |
+| W07 | [上下文工程](docs/lessons/W07-上下文工程.md) | 预算分配 / 压缩 / 缓存 | 上下文装配器 |
+| W08 | [清账周](docs/lessons/W08-清账周-阶段1.md) | 阶段 1 诊断与验收 | 工具循环可重放 |
+| W09 | [ReAct 与 Agent 循环](docs/lessons/W09-ReAct与Agent循环.md) | 手写 agent 内核 | 手写循环 + 校验 |
+| W10 | [LangGraph 状态图](docs/lessons/W10-LangGraph状态图.md) | 图 / 条件边 / 断点续跑 | 带回环的状态图 |
+| W11 | [项目一：端到端最小闭环](docs/lessons/W11-项目一-端到端最小闭环.md) | PRD / 工具集 / 打通 | 能跑的项目一 |
+| W12 | [清账周](docs/lessons/W12-清账周-项目一收口.md) | 阶段 2 验收 | 可试用版本 |
+| W13 | [RAG 地基](docs/lessons/W13-RAG地基-解析切分向量.md) | 解析 / 切分 / 向量库 | 最小可检索 |
+| W14 | [检索质量与评测](docs/lessons/W14-检索质量与评测.md) | 混合检索 / rerank / recall | 检索对比表 |
+| W15 | [RAG 工程化与记忆](docs/lessons/W15-RAG工程化与记忆.md) | 增量索引 / 记忆分层 | 项目一 v2 |
+| W16 | [清账周](docs/lessons/W16-清账周-项目二选题.md) | 阶段 3 验收 + 选题 | 项目二 PRD |
+| W17 | [多智能体编排](docs/lessons/W17-多智能体编排.md) | supervisor / 拆分判据 | 项目二骨架 |
+| W18 | [MCP](docs/lessons/W18-MCP.md) | client / server / 治理 | 自建 MCP server |
+| W19 | [长任务与可靠性](docs/lessons/W19-长任务与可靠性.md) | 断点续跑 / 幂等 / 执行边界 | 可靠运行层 |
+| W20 | [清账周](docs/lessons/W20-清账周-阶段自检.md) | 阶段 4 验收 + 框架选型表 | 项目二可演示 |
+| W21 | [评估与可观测](docs/lessons/W21-评估与可观测.md) | 评测集 / LLM-as-judge / trace | 回归命令 |
+| W22 | [部署、成本与安全](docs/lessons/W22-部署成本与安全.md) | FastAPI / 容器 / 成本 / 攻防 | **项目一公网 URL** |
+| W23 | [作品集与 Java 差异化](docs/lessons/W23-作品集与Java差异化.md) | README / 技术文 / Spring AI | 技术文 + 作品集 |
+| W24 | [冲刺与总复盘](docs/lessons/W24-冲刺与总复盘.md) | 自评 / 系统设计 / 投递 | 材料已发出 |
 
 ## 硬性规矩
 

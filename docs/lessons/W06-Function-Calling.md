@@ -3,6 +3,7 @@
 > 本周在计划中的位置：W05 让模型的话变成可校验的对象，本周让这句话变成**动作**。你要在不用任何 Agent 框架的前提下，手写出"模型请求 → 你执行 → 结果回填 → 模型再决策"的循环。后面 LangGraph、MCP、多智能体的所有抽象都是它的换皮，这一周做扎实，那些就只是语法。
 
 ## 本周导航
+
 | 日 | 主题 | 今天的产出物 |
 |---|---|---|
 | 周一 | 工具定义即 JSON Schema，执行权在你 | `src/tools/registry.py` + 一次手工工具调用 |
@@ -383,6 +384,7 @@ async def test_loop_detected_caps_the_spend(read_only_registry):
 3. 现在把 `agent_loop.py` 交给 W09 的 ReAct 用，接口上最可能缺哪一块？
 
 ## 本周术语卡
+
 | 术语 | 一句话解释 | 为什么重要 |
 |---|---|---|
 | tool calling / 工具调用 | 模型输出"调哪个工具、参数是什么"的结构化意图；旧称 function calling（字段 `functions`/`function_call`） | 执行权在你，模型没有手；旧字段新模型已废弃，抄旧教程必踩 |

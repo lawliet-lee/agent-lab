@@ -236,7 +236,7 @@ if __name__ == "__main__":
 
 **今天的动作**
 
-- [ ] 造 5~8 条负样本，其中至少 2 条"近似但无解"型（改参数、改条件），存进 `eval/labels.jsonl`（`kind: "negative"`）。
+- [ ] 造 5~8 条负样本，其中至少 2 条"近似但无解"型（改参数、改条件），存进 `evals/labels.jsonl`（`kind: "negative"`）。
 - [ ] 跑 `__main__`，把 25 个分数排序打印出来，**肉眼找空隙**，不要只看 `suggested`。
 - [ ] 定阈值并把 `metric/reason/index_fingerprint` 写进 `config/threshold.json`。
 - [ ] 验证：5 条负样本 5/5 拒答；20 条正样本误拒率报出数字。任一不达标就调阈值或加 rerank 分数作第二判据。
@@ -684,7 +684,7 @@ if __name__ == "__main__":
 ### 第一段 55' · 接线
 
 ```python
-"""projects/p1/graph.py 的关键改动骨架（只列增量，其余不动）"""
+"""projects/p1-assistant/graph.py 的关键改动骨架（只列增量，其余不动）"""
 from __future__ import annotations
 
 from langgraph.checkpoint.sqlite import SqliteSaver      # pip install langgraph-checkpoint-sqlite
