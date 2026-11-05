@@ -3,7 +3,6 @@
 > 本周在计划中的位置：前四周你能把消息发出去、把用量算清楚；这周解决"拿回来的东西能不能被程序消费"。学完你能用工程手段（而不是改措辞）把一次对话的输出变成可校验、可回放、可对比成本的契约。
 
 ## 本周导航
-
 | 日 | 主题 | 今天的产出物 |
 |---|---|---|
 | 周一 | Prompt 五要素与 system 重写 | `src/prompts/system_v2.md` + 逐条对照表 |
@@ -43,14 +42,12 @@ class Ticket(BaseModel):                    # 抽取结果 DTO：字段名即契
 
 class PromptSpec(BaseModel):                # src/prompts/spec.py：五要素的可校验表示
     role: str; task: str; constraints: list[str]; output_schema: type[BaseModel]
-
     @field_validator("constraints")
     @classmethod
     def must_be_testable(cls, v: list[str]) -> list[str]:
         bad = [c for c in v if not any(k in c for k in ("必须", "不得", "只", "禁止"))]
         if bad: raise ValueError(f"约束未写成可判定句式: {bad}")   # 愿望式约束等于没写
         return v
-
     def render(self) -> str:
         props = self.output_schema.model_json_schema()["properties"]  # 字段清单由 schema 生成
         fields = ", ".join(f'"{k}":{v.get("type")}取值{v.get("enum") or ""}' for k, v in props.items())
