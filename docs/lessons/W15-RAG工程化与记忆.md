@@ -618,8 +618,8 @@ def rebuild_one(conn, path: Path, mode: str, size: int) -> int:
                   "tok": c.tokens, "meta": '{"sec_level": 1}', "emb": "[" + ",".join(f"{x:.6f}" for x in v) + "]",
                   "dh": doc_hash})
         stale = conn.execute(
-            "DELETE FROM chunks WHERE doc_id=%(d)s AND doc_hash <> %(dh)s AND active",
-            {"d": doc_id, "dh": doc_hash}).rowcount             # 旧内容直接删（同 doc 的过期版本留着只会继续命中）
+            "UPDATE chunks SET active = false WHERE doc_id=%(d)s AND doc_hash <> %(dh)s AND active",
+            {"d": doc_id, "dh": doc_hash}).rowcount             # 软删：旧行留在库里，排查"上周为什么命中这条"时才用得上
         print(f"{doc_id}: 新 {len(chunks)} 条，清理旧版 {stale} 条，{time.perf_counter() - t0:.1f}s")
     return len(chunks)
 
