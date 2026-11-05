@@ -54,7 +54,7 @@ brew install uv
 uv python install 3.12
 
 # 3. 进你的学习仓库目录，初始化一个绑 3.12 的项目
-cd /Users/lawliet/Desktop/AI/agent-lab
+cd ~/Desktop/AI/agent-lab
 uv init --name agent-lab --python 3.12   # 生成 pyproject.toml 与 .python-version
 uv sync                                   # 建 .venv 并按 pyproject 装依赖
 

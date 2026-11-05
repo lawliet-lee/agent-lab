@@ -14,8 +14,6 @@
 | 周六 | 深度块：W09 全量迁移 + 得失分析 | 图版 ReAct + `notes/w10_migration.md` |
 | 周日 | 休息，不许补课 | — |
 
----
-
 ## 周一 · 为什么需要图，而不是 if-else
 
 **本质**：你的 `agent_loop.py` 就是一个 while 循环——它"能跑"。图（Graph）解决的不是"跑起来"，而是**把控制流从代码里抽出来变成数据**之后附带的一切：状态可持久化（每个节点边界自动快照）、执行可重放/可时间旅行、人工节点可插入（中断-恢复不需要你自己写挂起协议）、流程可视化（一张图贴给同事就能对齐）。if-else 版本这四件事全要你自己造——你上周刚造过一遍，知道造价。
@@ -23,7 +21,6 @@
 **Java 视角**：两个准确的类比。其一，JDBC 之于手写 socket：LangGraph 不是给你新能力，是把每个项目都要重写的连接管理/事务边界标准化。其二，状态机引擎之于 `switch-case`：转移表是数据时，你才能持久化"当前状态"、才能在任意转移处挂起等人工审批。注意反类比：它**不是** BPMN 那种重量级流程引擎，节点就是普通 Python 函数，没有 DSL。
 
 **核心讲解**：四个概念，一句话各：
-
 - **State（状态）**：一个共享数据结构（`TypedDict` 或 Pydantic `BaseModel`），在节点间流动。关键机制：节点**返回增量**（`{"messages": [新消息]}`），框架用 **reducer** 合并——默认覆盖；字段标注 `Annotated[list, operator.add]` 则追加。你的 ReAct 循环里"把 assistant 消息 append 进 messages"这件事，在这里变成 state 声明的一部分。
 - **Node（节点）**：`(state) -> 增量dict` 的函数（也可以是 LLM 调用、工具执行、校验，任何 Python）。节点的粒度就是你的 checkpoint 粒度：**每两个节点边界之间是原子的，边界上是可恢复的**。
 - **Edge（边）**：`add_edge("a", "b")` 固定转移。`START`/`END` 是特殊伪节点，标记入口出口。
@@ -32,7 +29,6 @@
 和上周对照着记：`should_continue` 就是你的 finish_reason 判断；`while step < MAX` 没了——**最大步数改由 `compile(...)`/invoke 配置里的 recursion_limit 管理**（默认 25，超限抛 `GraphRecursionError`）。这是本周一处真实的控制转移：护栏从你的 while 条件挪到了框架参数，`config={"recursion_limit": 12}` 显式设，别用默认值兜底业务循环。
 
 **代码**：先装环境，再跑通 20 行的最小闭包：
-
 ```bash
 pip install langgraph          # 主包
 pip install langgraph-checkpoint-sqlite   # 周三才用到，但一次装好
@@ -42,28 +38,20 @@ pip install langgraph-checkpoint-sqlite   # 周三才用到，但一次装好
 import operator
 from typing import Annotated, Literal, TypedDict
 from langgraph.graph import StateGraph, START, END
-
 class State(TypedDict):
     topic: str
     jokes: Annotated[list[str], operator.add]   # add reducer：追加而非覆盖
     verdict: str
-
 def make_joke(state: State) -> dict:
     return {"jokes": [f"关于 {state['topic']} 的第 {len(state['jokes'])+1} 个笑话"]}
-
 def judge(state: State) -> dict:
-    ok = len(state["jokes"]) >= 2   # 占位：真实场景这里调 LLM 或规则
-    return {"verdict": "pass" if ok else "retry"}
-
+    return {"verdict": "pass" if len(state["jokes"]) >= 2 else "retry"}  # 占位：真实场景调 LLM 或规则
 def route(state: State) -> Literal["make_joke", END]:
     # 路由函数只读 state、返回节点名，不改 state —— 和节点的职责分界
     return "make_joke" if state["verdict"] == "retry" else END
-
 g = StateGraph(State)
-g.add_node("make_joke", make_joke)
-g.add_node("judge", judge)
-g.add_edge(START, "make_joke")
-g.add_edge("make_joke", "judge")
+g.add_node("make_joke", make_joke); g.add_node("judge", judge)
+g.add_edge(START, "make_joke"); g.add_edge("make_joke", "judge")
 g.add_conditional_edges("judge", route, ["make_joke", END])  # 回边=循环
 app = g.compile()
 print(app.invoke({"topic": "Java 程序员", "jokes": [], "verdict": ""}))
@@ -73,8 +61,7 @@ print(app.invoke({"topic": "Java 程序员", "jokes": [], "verdict": ""}))
 - [ ] 装包，跑通上面这段，亲眼看 `jokes` 数组被追加了两轮才走到 END（说明回边生效）。
 - [ ] 故意把 `judge` 改成永远 retry + 不设限，观察 `GraphRecursionError` 的报错形态——以后见到它就是死循环被护栏掐了。
 - [ ] 写 `notes/w10_why_graph.md`：四个能力（持久化/重放/人工节点/可视化）各自"if-else 版你自己怎么造、造价多少"，对照上周你真实写过的那部分。
-- [ ] 验证：笔记里每条能力都能指认 W09 里的对应手工实现（如持久化↔JSONL、重放↔replay.py）。
-- [ ] commit + 日志。
+- [ ] 验证：笔记里每条能力都能指认 W09 里的对应手工实现（如持久化↔JSONL、重放↔replay.py）。能→commit + 日志。
 
 **会踩的坑**：
 1. **节点返回了整个 state 而不是增量**：`return state` 会把全部字段再过一遍 reducer，list 字段直接翻倍。只返回改了的 key。
@@ -86,8 +73,6 @@ print(app.invoke({"topic": "Java 程序员", "jokes": [], "verdict": ""}))
 1. 用一句话说清 node 边界为什么等于 checkpoint 边界。
 2. reducer 解决什么问题？没有它的话，两个并行节点写同一字段会怎样？
 3. `recursion_limit` 和你上周手写的 `MAX_STEPS` 语义差别在哪（提示：数的是什么——轮数还是节点执行次数）？
-
----
 
 ## 周二 · 最小图：检索 → 生成 → 校验，失败回检索
 
@@ -103,35 +88,29 @@ print(app.invoke({"topic": "Java 程序员", "jokes": [], "verdict": ""}))
 2. **尝试次数也要进 state**（`attempts: int`），别依赖 recursion_limit 兜底回环。recursion_limit 是熔断器，`attempts >= 2 → END` 才是业务语义的"最多修两次"。两层都要。
 
 **代码**：`experiments/w10/mini_graph.py`（LLM 部分你从 `llm/` 层拿现成的，伪略处已注释）：
-
 ```python
 import operator
 from typing import Annotated, Literal, TypedDict
 from langgraph.graph import StateGraph, START, END
 from pydantic import BaseModel, ValidationError
-
 class GraphState(TypedDict):
     question: str
     docs: list[str]                 # 每轮整体覆盖：检索结果本来就该是新的
     draft: str
     errors: Annotated[list[str], operator.add]
     attempts: int
-
 def retrieve(state: GraphState) -> dict:
     query = state["question"]
     if state.get("errors"):
         # 把失败原因折进查询：上一轮"缺少来源引用"→这轮多取候选片段
         query = f"{query}（补充依据：{state['errors'][-1][:80]}）"
     return {"docs": fake_search(query, top_k=3), "attempts": state.get("attempts", 0) + 1}
-
 def generate(state: GraphState) -> dict:
     ctx = "\n---\n".join(state["docs"])
     return {"draft": llm_answer(state["question"], ctx)}   # 你的 llm/ 层函数
-
 class Answer(BaseModel):
     text: str
     source_indexes: list[int]
-
 def check(state: GraphState) -> dict:
     errs: list[str] = []
     try:
@@ -143,23 +122,21 @@ def check(state: GraphState) -> dict:
     if len(ans.text) < 20:
         errs.append("答案过短，疑似未基于检索片段")
     return {"errors": errs} if errs else {"errors": []}
-
 def route(state: GraphState) -> Literal["retrieve", END]:
     if state["errors"] and state["attempts"] < 3:
         return "retrieve"
     return END     # 注意：错误没解决也放行——带 errors 的降级输出交给调用方
-
-app = StateGraph(GraphState).compile()   # 下面真正组装，此处示意
-# 组装省略三行 add_node + add_edge(START,"retrieve") + add_edge("retrieve","generate")
-#          + add_edge("generate","check") + add_conditional_edges("check", route, ["retrieve", END])
-
-for chunk in app.invoke.__self__.stream(   # 或直接 app.stream(...)
-        {"question": "连接池耗尽的默认超时是多少？", "docs": [], "draft": "", "errors": [], "attempts": 0},
-        stream_mode="updates", config={"recursion_limit": 12}):
+b = StateGraph(GraphState)
+for name, fn in [("retrieve", retrieve), ("generate", generate), ("check", check)]:
+    b.add_node(name, fn)
+b.add_edge(START, "retrieve"); b.add_edge("retrieve", "generate"); b.add_edge("generate", "check")
+b.add_conditional_edges("check", route, ["retrieve", END])   # 回边=自愈循环，组装全部显式写出不许略
+app = b.compile()
+for chunk in app.stream({"question": "连接池耗尽的默认超时是多少？", "docs": [], "draft": "", "errors": [], "attempts": 0}, stream_mode="updates", config={"recursion_limit": 12}):
     print(chunk)   # 每个节点执行完打印 {节点名: 状态增量}，回环轨迹一目了然
 ```
 
-（最后那段 stream 调用的写法：`app.stream(input, stream_mode="updates")`，逐 chunk 打印即可；如你装到的版本输出结构不同——新版可能是 `{"type": ..., "data": ...}` 信封格式——`# 当前版本写法请核对官方 tutorial`，以你能打印出"每步谁改了哪些字段"为准。）
+（若你装到的版本 stream 输出是 `{"type": ..., "data": ...}` 信封格式而非 `(节点名, 增量)`——`# 当前版本写法请核对官方 tutorial`，先原样打印一个 chunk 再写消费逻辑，以能打出"每步谁改了哪些字段"为准。）
 
 **今天的动作**：
 - [ ] 完整写出三节点+条件边组装（上面省略的部分自己补，不许复制依赖理解）。
@@ -178,8 +155,6 @@ for chunk in app.invoke.__self__.stream(   # 或直接 app.stream(...)
 2. 把错误原因写进 state 而不是直接重新检索，给回环带来了什么？
 3. 这张图是 agent 还是 workflow？用 W09 三条判据逐条答。
 
----
-
 ## 周三 · checkpointer 与 thread_id：会话自动恢复
 
 **本质**：checkpointer 让图在**每个节点边界**把 state 快照写入存储；`thread_id` 是会话主键。同一 `thread_id` 下再次 invoke，框架自动把上次终态作为本次起点——你上周用 JSONL+replay.py 手工实现的"恢复"，这里是一个构造参数的事。而且它恢复的不只是消息历史：图走到哪、哪个节点挂起、还差什么，都在快照里。
@@ -187,7 +162,6 @@ for chunk in app.invoke.__self__.stream(   # 或直接 app.stream(...)
 **Java 视角**：`thread_id` 之于 checkpointer ≈ HttpSession 的 session ID 之于容器持久化的 session（Tomcat 把 session 写 Redis/文件那种）。checkpoint 本身类似事务日志里的快照点：不只有"当前值"，还带元信息（哪个节点写的、第几步），为周四的"从任意点挂起/恢复"和 time-travel 留好了结构。
 
 **核心讲解**：
-
 - **装谁**：本地开发用 SQLite checkpointer（任务表指定）。包名 `langgraph-checkpoint-sqlite`，import `from langgraph.checkpoint.sqlite import SqliteSaver`，用 `SqliteSaver.from_conn_string("checkpoints.sqlite")` 拿到，**它要实现上下文管理器协议**（`with` 里用；离开 with 连接关闭）。老文档里出现的 `MemorySaver` 在新版官方文档里叫 `InMemorySaver`（`from langgraph.checkpoint.memory import InMemorySaver`）——进程内存、重启即丢，只配写单测。`# 当前版本写法请核对官方 tutorial`：拿到包后先跑一段 with 代码确认导入路径没变。
 - **编译时机**：`checkpointer` 在 `compile(checkpointer=...)` 传入，不是 invoke 时传。传了它的图**必须**在 config 里给 `thread_id`，不给直接报错——框架拒绝"有状态但不指定谁的状态"这种含糊。
 - **恢复机制**：invoke(thread_id=T) 时：读 T 的最新 checkpoint → 作为初始 state 合并（消息列表经 reducer 追加）→ 从 START 跑。所以"多轮对话"= 同 thread_id 连续 invoke，你的 `messages` reducer 自动把历史带上。
@@ -195,26 +169,21 @@ for chunk in app.invoke.__self__.stream(   # 或直接 app.stream(...)
 - **thread 不是用户**：`thread_id` = 一个会话/一条对话线，用户 ↔ thread 的一对多映射是你业务的事（`user:{id}:chat:{uuid}` 这种拼法够用）。换 thread_id 就是干净的新会话，**测试隔离也用它**。
 
 **代码**：`experiments/w10/chat_graph.py`（两节点极简对话图 + 持久化）：
-
 ```python
 import operator
 from typing import Annotated, TypedDict
 from langchain_core.messages import AnyMessage, HumanMessage  # 消息类型沿用你W06起的依赖
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.sqlite import SqliteSaver
-
 class ChatState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]
-
 def respond(state: ChatState) -> dict:
     reply = llm_chat(state["messages"])          # 你的 llm/ 层，返回 AIMessage
     return {"messages": [reply]}
-
 builder = StateGraph(ChatState)
 builder.add_node("respond", respond)
 builder.add_edge(START, "respond")
 builder.add_edge("respond", END)
-
 with SqliteSaver.from_conn_string("checkpoints.sqlite") as saver:
     app = builder.compile(checkpointer=saver)
     cfg = {"configurable": {"thread_id": "demo-01"}}   # 会话主键在这
@@ -244,8 +213,6 @@ with SqliteSaver.from_conn_string("checkpoints.sqlite") as saver:
 2. `get_state(cfg).next` 非空意味着什么？（图挂起/中断在哪些节点——周四的主角。）
 3. 为什么说"接了 checkpointer 仍手动拼历史"是双倍付费？从 token 和正确性两方面说。
 
----
-
 ## 周四 · interrupt 与 resume：把人工确认做进图里
 
 **本质**：agent 执行写操作（改配置、删数据、发工单）前需要人来点头。你在 W06 周五手写过确认门——命令行 `input()` 阻塞等待。那是**进程内挂起**：终端一关、状态全丢。LangGraph 的 `interrupt()` 是**持久化挂起**：节点抛中断信号 → 图停住、快照落盘 → 进程可以退出 → 任何时候（换一台机器也行）带着 `Command(resume=...)` 回来继续。等待审批三小时和等待三秒钟，机制上完全一样。
@@ -261,21 +228,17 @@ with SqliteSaver.from_conn_string("checkpoints.sqlite") as saver:
 对照你手写的确认门，框架替你省的三件事：(1) 挂起状态的序列化（你以前要么阻塞要么自己造 pending 文件）；(2) 审批超时/换人审批的恢复路径（新的进程读同一 thread 即可）；(3) 中断点可查询——`get_state(cfg).next` 直接告诉你图卡在哪个节点，`.tasks[*].interrupts` 里躺着审批 payload。没省的：审批人是谁、通知渠道、超时升级——业务逻辑照旧你写。
 
 **代码**：`experiments/w10/hitl_graph.py`：
-
 ```python
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver   # 演示用；跨进程就换 SqliteSaver
 from langgraph.types import Command, interrupt
-
 class S(TypedDict):
     action: str
     approved: bool
     log: list[str]
-
 def prepare(state: S) -> dict:
     return {"log": [f"准备执行: {state['action']}"]}    # 纯计算，无副作用
-
 def gate(state: S) -> dict:
     # payload 面向审批人：干什么、影响面、拒绝会怎样，一次说全
     decision = interrupt({
@@ -284,12 +247,10 @@ def gate(state: S) -> dict:
     })
     # ↑ 首次执行到这里图就停了；resume 后这行直接拿到 Command(resume=) 的值
     return {"approved": decision == "yes"}
-
 def write_op(state: S) -> dict:
     if not state["approved"]:
         return {"log": ["用户拒绝，未执行"]}
     return {"log": ["副作用已执行"]}                      # 不可逆操作只出现在 interrupt 之后
-
 b = StateGraph(S)
 for name, fn in [("prepare", prepare), ("gate", gate), ("write_op", write_op)]:
     b.add_node(name, fn)
@@ -297,7 +258,6 @@ b.add_edge(START, "prepare"); b.add_edge("prepare", "gate")
 b.add_edge("gate", "write_op"); b.add_edge("write_op", END)
 app = b.compile(checkpointer=InMemorySaver())
 cfg = {"configurable": {"thread_id": "ops-42"}}
-
 out = app.invoke({"action": "重启生产数据库", "approved": False, "log": []}, cfg)
 print(out["__interrupt__"])                # invoke 正常返回，中断信息在 __interrupt__ 键里
 ans = input("审批人答复 yes/no > ")         # 演示用同步等待；真实场景这里可以是几小时后另一进程
@@ -309,8 +269,7 @@ print(out2["log"])
 - [ ] 跑通 interrupt→resume 全流程，打印 `get_state(cfg).next` 在挂起前后的值（挂起时是 `("gate",)`——图明确告诉你卡在哪）。
 - [ ] 演示跨进程恢复：挂起后 Ctrl-C 杀掉进程，另起脚本用 SqliteSaver + 同 thread_id 执行 `Command(resume="yes")`，确认 write_op 照常执行。这一步做成，你对持久化中断的理解才算落地。
 - [ ] 把 `write_op` 里一行注释测试副作用：在 gate 的 interrupt **之前**加一行 `print("写了一半")` 或模拟副作用，resume 后观察它执行了几次，结论写进笔记。
-- [ ] 写 3 行对比：W06 手写门 vs 今天的门（阻塞行为/跨进程能力/状态查询能力三列）。
-- [ ] commit + 日志。
+- [ ] 写 3 行对比：W06 手写门 vs 今天的门（阻塞行为/跨进程能力/状态查询能力三列），一并 commit + 日志。
 
 **会踩的坑**：
 1. **resume 到一半副作用翻倍**：就是上面测试的那次——interrupt 前的代码重跑。症状常是"重复发邮件/重复插库"。纪律：节点里 `interrupt` 之前只准纯读。
@@ -323,8 +282,6 @@ print(out2["log"])
 2. 审批 payload 里该放哪些信息？（要操作的资源、变更内容、回滚方式、影响面。）缺一样，审批人会在哪个环节骂你？
 3. W19 长任务断点续跑和今天的关系：哪些设计你今天已经用上了（thread 语义、幂等分区）？
 
----
-
 ## 周五 · 流式：节点事件流 ≠ token 流
 
 **本质**：两种"流"回答不同的问题。**节点事件流**（`stream_mode="updates"`）：图跑到哪了、每步改了什么——给进度条和 trace 用。**token 流**（`stream_mode="messages"`，LLM 增量）：答案文本一个字一个字出来——给打字机效果用。它们的粒度、频率、数据结构全不同，把两码事混在一个 for 循环里是这个模块最经典的困惑源。
@@ -332,7 +289,6 @@ print(out2["log"])
 **Java 视角**：像 SSE 事件流里的 `event: progress`（结构化里程碑）和 `event: delta`（内容增量）两种事件类型；前端对它们的渲染逻辑完全不同。你的终端就是前端，今天学会分辨 event 类型。
 
 **核心讲解**：
-
 - `stream_mode="updates"`：每执行完**一个节点**产出一次 `{节点名: 状态增量}`。一个 10 步循环的 agent 大约几十个事件，低频、结构化，正是"当前在哪个节点"的数据源。
 - `stream_mode="values"`：每个节点后推**全量 state 快照**。简单但每帧都是整个 messages 列表，费带宽，前端做整体刷新才用。
 - `stream_mode="messages"`：产出 `(LLM消息增量, metadata)` 二元组，节点内 `model.stream` 级别的 token，高频（一次生成几百个）、无结构。metadata 里有节点名/tags，**可以用来把 token 归属到节点**。
@@ -342,12 +298,9 @@ print(out2["log"])
 一个真实产品的组合姿势：updates 驱动"⏳ 正在检索…"这类阶段提示，messages 只在你**决定把某个生成节点的输出直接透传给用户**时消费。工具执行节点永远不该出现在 token 流里。
 
 **代码**：`experiments/w10/stream_ui.py`（沿用周三的 ChatState 图，给 respond 换成流式模型输出）：
-
 ```python
 from langgraph.checkpoint.sqlite import SqliteSaver
-
 NODE_LABEL = {"respond": "✍️ 生成回答", "retrieve": "🔎 检索中", "check": "🧪 校验中"}
-
 with SqliteSaver.from_conn_string("checkpoints.sqlite") as saver:
     app = builder.compile(checkpointer=saver)     # 用你周二/周三组装好的图
     cfg = {"configurable": {"thread_id": "stream-demo"}}
@@ -371,8 +324,7 @@ with SqliteSaver.from_conn_string("checkpoints.sqlite") as saver:
 跑起来的预期效果：先打印 `[✍️ 生成回答]`（节点开始），随后答案逐字出现——**这两件事在数据层面的来源完全不同**，你要能说出来：前者是 updates 模式在节点**完成**时产出（节点边界事件），后者是 messages 模式在模型**解码中**产出。严格说 updates 的"当前在哪个节点"其实是"刚跑完哪个节点"；要做真·实时当前节点，用 values 模式的起点帧或给节点加 custom 事件。这个细微差别写进笔记。
 
 **今天的动作**：
-- [ ] 先单独跑 `stream_mode="updates"`，原样打印 5 个 chunk 的结构存进笔记，再写渲染——顺序别倒。
-- [ ] 换成组合模式跑通"阶段提示 + 打字机"终端输出。
+- [ ] 换成组合模式跑通"阶段提示 + 打字机"终端输出：先原样打印 5 个 chunk 的结构存进笔记，再写渲染——顺序别倒。
 - [ ] 打印一个 messages 模式的 metadata，确认里面节点名字段叫什么（`langgraph_node`？），token 归属能按它过滤。
 - [ ] 验证：中途 Ctrl-C 再重跑同 thread_id，确认（有 checkpointer）会话没烂——流式消费失败 ≠ 图状态损坏。
 - [ ] commit + 日志。
@@ -387,8 +339,6 @@ with SqliteSaver.from_conn_string("checkpoints.sqlite") as saver:
 1. 用户抱怨"半天没反应"，但 token 其实一直在流。该升级到哪种模式排查，看什么数据？
 2. updates 事件和 W09 你 JSONL 里的 llm_call 事件，信息量差在哪？（谁记了什么、谁丢了什么——W21 接 Langfuse 时谁补上？graph 的 updates 天然缺 latency/tokens，要在节点内自测补记。）
 3. 为什么 messages 模式能拿到 token 而 updates 不能？从产出时机（解码中 vs 节点完成）回答。
-
----
 
 ## 周六 · 深度块（120 分钟）：W09 全量迁移 + 得失分析
 
@@ -412,7 +362,6 @@ class ReactState(TypedDict):
     errors: Annotated[list[str], operator.add]
     repairs: int
     observations: list[str]        # 供 validate 核对引用
-
 def route(state: ReactState) -> Literal["tools", "confirm", "validate", END]:
     last = state["messages"][-1]
     if getattr(last, "tool_calls", None):
@@ -420,7 +369,6 @@ def route(state: ReactState) -> Literal["tools", "confirm", "validate", END]:
     if isinstance(last.content, str) and last.content:
         return "validate"
     return END
-
 b = StateGraph(ReactState)
 # add_node: agent_turn/tools/confirm/validate/tracer；边按上面划分接
 app = b.compile(checkpointer=saver)

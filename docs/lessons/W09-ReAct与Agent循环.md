@@ -14,8 +14,6 @@
 | 周六 | 深度块：断点重放 | replay 脚本 + 一次真实故障的定位记录 |
 | 周日 | 休息，不许补课 | — |
 
----
-
 ## 周一 · workflow 与 agent 的分界
 
 **本质**：Anthropic《Building effective agents》的核心论点不是"agent 好"，而是**大多数场景你该用 workflow，但你必须知道自己在用哪个**。workflow 的控制流（先做什么、后做什么、走哪个分支）写死在你的代码里；agent 的控制流由模型在运行时决定——它自己决定下一步调哪个工具、还要不要继续。这个区别决定了你的成本、延迟、可评估性和故障模式，全部不一样。
@@ -35,17 +33,12 @@
 Agent 的代价要写实：延迟不可预算（步数不定）、成本不可预算（同上）、评估难（同输入不同轨迹）、故障模式新增（循环、工具误用、幻觉级联）。Agent 的收益也写实：你不需要为没见过的问题预先写分支。
 
 **代码**：今天不写代码，用代码思维整理判据。下面这个函数当作你笔记的骨架：
-
 ```python
 from enum import Enum
-
 class Style(Enum):
-    WORKFLOW = "workflow"   # 控制流全部预定义
-    AGENT = "agent"         # 控制流由模型输出决定
-    HYBRID = "hybrid"       # 外层 workflow，内层局部 agent
-
+    WORKFLOW, AGENT, HYBRID = "workflow", "agent", "hybrid"  # 控制流预定义 / 模型决定 / 外层flow内层agent
 def classify(paths_enumerable: bool, exit_by_model: bool, steps_vary: bool) -> Style:
-    """不是运行时函数，是你做选型时的决策表。"""
+    """不是运行时函数，是你做选型时的决策表。三判据各一票。"""
     votes = [exit_by_model, steps_vary, not paths_enumerable]
     if sum(votes) == 0: return Style.WORKFLOW
     if sum(votes) == 3: return Style.AGENT
@@ -67,8 +60,6 @@ def classify(paths_enumerable: bool, exit_by_model: bool, steps_vary: bool) -> S
 1. 一个系统：固定调 2 次 LLM（改写查询→生成答案），但检索词由模型自由输出。它是 workflow 还是 agent？（答案：workflow；模型输出内容自由≠控制流自由。）
 2. 为什么 agent 的 P99 延迟天然难承诺？用"步数随输入变化"推出来说。
 3. 给出一个你工作里明确该用 workflow 的场景和一个该用 agent 的场景，各一句理由。
-
----
 
 ## 周二 · 文本协议版 ReAct：亲手体验脆弱
 
@@ -99,27 +90,21 @@ Thought: I know the answer now.   Final Answer: ...
 **今天的动作不是把解析做多优雅，而是把失败计数打开**：每次解析失败记一行（原因分类 + 原始文本），跑 10 个问题后你会拿到一张脆弱性账单——这就是周三对比表的左半边。
 
 **代码**：`experiments/w09/react_text.py` 核心解析器（Python 3.12）：
-
 ```python
 import json, re
 from dataclasses import dataclass
 from typing import Any
-
 @dataclass
 class ParsedStep:
     kind: str            # "action" | "final" | "invalid"
-    thought: str = ""
     tool: str | None = None
     args: dict[str, Any] | None = None
     final: str | None = None
     error: str | None = None
-
 # 全部正则带 IGNORECASE 且冒号写成 [:：]（全角冒号是中文场景实测高频坑）
 FINAL_RE   = re.compile(r"final\s+answer\s*[:：]\s*(.+)", re.I | re.S)
 ACTION_RE  = re.compile(r"^\s*action\s*[:：]\s*([A-Za-z0-9_\u4e00-\u9fff]+)", re.I | re.M)
 INPUT_RE   = re.compile(r"action\s+input\s*[:：]\s*", re.I)
-THOUGHT_RE = re.compile(r"thought\s*[:：]\s*(.+?)(?=\n\s*(?:action|final)|\Z)", re.I | re.S)
-
 def parse_react_turn(text: str) -> ParsedStep:
     """解析模型的一轮输出。宁可返回 invalid 也不要猜。"""
     if len(ACTION_RE.findall(text)) > 1:
@@ -138,8 +123,7 @@ def parse_react_turn(text: str) -> ParsedStep:
         args, _ = json.JSONDecoder().raw_decode(raw)
     except json.JSONDecodeError as e:
         return ParsedStep("invalid", error=f"bad_json:{e.msg}", tool=am.group(1))
-    th = THOUGHT_RE.search(text)
-    return ParsedStep("action", tool=am.group(1), thought=th.group(1).strip() if th else "",
+    return ParsedStep("action", tool=am.group(1),
                       args=args if isinstance(args, dict) else {"query": args})
 ```
 
@@ -162,8 +146,6 @@ def parse_react_turn(text: str) -> ParsedStep:
 2. 为什么解析器要"宁可 invalid 也不猜"？猜的代价在哪个环节暴露？
 3. 你的失败账单上哪一类占比最高？周三后能用数据回答。
 
----
-
 ## 周三 · 原生 tool calling 版 ReAct
 
 **本质**：同一个任务循环，把"文本协议 + 正则解析"换成模型 API 的原生 tool calling：工具定义以 JSON Schema 随请求发出，模型返回结构化的 `tool_calls` 字段，`arguments` 是合法 JSON 字符串。执行权、循环权仍然全在你手里——和 W06 没变，变的是**协议承载方式**。直接复用你的 `agent_loop.py`，今天做的是"改造 + 对照实验"。
@@ -181,20 +163,15 @@ def parse_react_turn(text: str) -> ParsedStep:
 对照实验设计（这是今天真正的产出）：固定同一 10 个问题、`temperature=0`，两版各跑一遍，记四个指标：**协议错误率**（解析失败或非法入参次数/总步数）、**任务通过率**、**平均步数**、**平均总 token**（input+output 分列）。预期结果与解释：文本协议错误率明显高（5-15%/步很常见）；token 上文本协议的 output 更长（Thought/Action 样板）且 input 随 scratchpad 滚雪球，原生版每步 input 也涨但增速低（tool 消息比手写 Observation 紧凑）；原生版有隐性成本——工具 schema 每请求都占 input token，工具多时不小。
 
 **代码**：`experiments/w09/react_native.py`，核心是把 W06 循环改造成"带计数的可插桩版本"：
-
 ```python
 from openai import OpenAI            # 1.x 风格，沿用 W06 起的约定
 from pydantic import BaseModel, Field
-
 client = OpenAI()  # key 在 .env，绝不硬编码
-
 class SearchArgs(BaseModel):
     query: str = Field(min_length=1)
-
 TOOLS = [{"type": "function", "function": {"name": "search",
           "description": "全文检索，返回最相关的若干条片段。",
           "parameters": SearchArgs.model_json_schema()}}]
-
 def run_native(question: str, max_steps: int = 8) -> dict[str, object]:
     msgs: list[dict] = [{"role": "user", "content": question}]
     for step in range(1, max_steps + 1):                 # 硬上限，撞线即标记 terminated_by
@@ -234,8 +211,6 @@ def run_native(question: str, max_steps: int = 8) -> dict[str, object]:
 2. 为什么原生版的 token 优势可能随工具数量增多而缩水？（schema 进 input。）什么手段能对冲？（W07 的 prompt caching，固定工具前缀。）
 3. 文本协议版在什么情况下仍然是正确选择？至少想两个：不支持 tool calling 的 endpoint、需要把"Thought"显式暴露给用户的场景……写进笔记。
 
----
-
 ## 周四 · 完成判定：模型说"做完了"不算数
 
 **本质**：循环的**终止**和**完成**是两件事。终止是控制流层面（模型不再发 tool_call、或撞了步数上限）；完成是语义层面（输出真的满足任务要求）。模型自述"我做完了"不可信——不是它想骗你，而是（a）RLHF 训练偏好"给出一个答案"而非"承认没答案"，（b）它看不到你没定义的业务约束，（c）多轮工具结果里它可能引用错。所以需要一个**显式校验节点**：终止≠放行，放行只由校验决定。
@@ -253,22 +228,18 @@ def run_native(question: str, max_steps: int = 8) -> dict[str, object]:
 失败处理策略要有预算：校验失败→把**具体错误列表**回喂（"缺少字段 root_cause；引用的 L123 在检索结果中不存在"）→重新生成，**修复轮数上限 2**；超限后降级：输出最后一次结果 + `completed=False` + 失败原因列表，交给调用方决定。**绝不允许无限修复循环**——那是最隐蔽的烧钱模式。降级输出的 `terminated_by` 字段区分：`model_done_validated` / `repair_exhausted` / `max_steps` / `budget`，这直接对应阶段验收里"完成判定不能信模型自述"的证据链。
 
 **代码**：`experiments/w09/validator.py`（接在 `react_native.py` 的返回路径上）：
-
 ```python
 from pydantic import BaseModel, field_validator
-
 class FinalOutput(BaseModel):
     root_cause: str
     evidence_lines: list[int]           # 引用的日志行号，必须来自工具返回
     suggestion: str
-
     @field_validator("evidence_lines")
     @classmethod
     def not_empty(cls, v: list[int]) -> list[int]:
         if not v:
             raise ValueError("evidence_lines 不能为空")
         return v
-
 def validate_final(raw: str, observations: list[str]) -> tuple[FinalOutput | None, list[str]]:
     """返回 (结果, 人可读的错误列表)。错误列表将原样回喂模型——具体到字段，不许笼统。"""
     try:
@@ -280,7 +251,6 @@ def validate_final(raw: str, observations: list[str]) -> tuple[FinalOutput | Non
     if fake:
         return None, [f"引用了不存在的日志行: {fake}，可用行号: {sorted(known)[:20]}"]
     return out, []
-
 # 主循环接法（伪代码）：finish_reason != "tool_calls" 后进入校验回环，
 # repair < 2 轮：失败把 errs 作为 user 消息回喂再请求一次；
 # 超限则返回降级结果并标 terminated_by="repair_exhausted"（绝不无限修复）。
@@ -302,8 +272,6 @@ def validate_final(raw: str, observations: list[str]) -> tuple[FinalOutput | Non
 1. 为什么"格式→契约→语义"这个顺序？反过来做有什么问题？
 2. "引用行号真实存在"用程序判定和用 LLM judge 判定，各花多少钱、误差如何？你的答案是哪个？
 3. `terminated_by="max_steps"` 的这次运行，最终答案该不该返回给用户？说出你的策略并检查代码里是否一致。
-
----
 
 ## 周五 · JSONL 落盘：给未来 Langfuse 铺轨
 
@@ -335,19 +303,16 @@ def validate_final(raw: str, observations: list[str]) -> tuple[FinalOutput | Non
 写入方式：追加模式、每行 `json.dumps(..., ensure_ascii=False)` + `flush()`。别攒到最后一次写——进程崩了全丢，你就白学了今天的课。
 
 **代码**：`experiments/w09/tracer.py`：
-
 ```python
 import json, hashlib, uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-
 @dataclass
 class Tracer:
     session_id: str = field(default_factory=lambda: "s-" + uuid.uuid4().hex[:8])
     out_dir: Path = Path("runs")
     _step: int = 0
-
     def log(self, event: str, *, parent: int | None = None, **payload: object) -> int:
         self._step += 1                    # step_idx 单调递增：重放定位键 + 幂等键
         rec = {"ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
@@ -360,10 +325,8 @@ class Tracer:
             f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")  # default=str 兜 datetime
             f.flush()                      # 崩了也保得住已跑过的 11 步，攒批写=白学本课
         return self._step
-
 def sha(s: str) -> str:
     return "sha256:" + hashlib.sha256(s.encode()).hexdigest()[:16]
-
 # 用法：sid = tr.log("session_start", question=q)
 # tr.log("llm_call", parent=sid, model=M, tokens=usage, latency_ms=..., finish=...)
 # tr.log("tool_call", parent=sid, tool="search", input=args, output=obs, output_hash=sha(obs))
@@ -386,8 +349,6 @@ def sha(s: str) -> str:
 2. `output_hash` 和 `output_excerpt` 各自回答什么问题？只有 excerpt 时你会在哪种故障上瞎掉？
 3. 同一 session 内 `step_idx` 撞号会发生什么？你的重放逻辑依赖什么不变式？
 
----
-
 ## 周六 · 深度块（120 分钟）：断点重放与一次真实故障定位
 
 **本质**：JSONL 只是日志，能**从任意一步恢复继续执行**才是重放（replay）。这是本周验收的重头，也是 W19 长任务断点续跑的雏形——思想完全一致：状态可序列化 + 步骤可定位 + 副作用可幂等。
@@ -408,17 +369,11 @@ def sha(s: str) -> str:
 | LLM 调用 | 重新执行，但输入严格还原 | 它是被测对象本身，缓存它就没意义了 |
 
 **代码**：`experiments/w09/replay.py` 骨架：
-
 ```python
 import json
 from pathlib import Path
-
 def load_events(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text("utf-8").splitlines() if line.strip()]
-
-def find_step(events: list[dict], n: int) -> dict:
-    return next(e for e in events if e["step_idx"] == n)
-
 def resume_from(path: Path, n: int, *, live_tools: bool = False) -> None:
     events = load_events(path)
     # 1) 还原到第 n 步的 messages：按 step_idx 顺序重放 llm_call/tool_call 增量（今天主要工作量）

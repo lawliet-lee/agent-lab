@@ -611,7 +611,7 @@ print("用量：", data.get("usage"))  # 若为 None，说明服务商把 usage 
 
 **第二段 55' · 主仓库定型**
 
-- [ ] 目录按 [07-每日执行模板.md](/Users/lawliet/Desktop/AI/07-每日执行模板.md) 最后一节的结构建全（`src/llm`、`src/prompts`、`src/tools`、`src/agent`、`src/retrieval`、`evals`、`experiments`、`projects`）。
+- [ ] 目录按 [07-每日执行模板.md](../plan/07-每日执行模板.md) 最后一节的结构建全（`src/llm`、`src/prompts`、`src/tools`、`src/agent`、`src/retrieval`、`evals`、`experiments`、`projects`）。
 - [ ] 把本周代码归位：`models.py` 进 `src/llm/`，`config.py` 留在 `src/`，W01 工具进 `src/pyforjava/`。
 - [ ] README 写清：这是什么、环境怎么起（uv 三条命令）、`.env.example` 说明、目录结构、当前进度。
 - [ ] `uv run pytest` 全绿 + `uv run pyright` 零报错，作为后续所有提交的门槛。
