@@ -1,0 +1,39 @@
+# 密钥与本地配置
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.uv-cache/
+
+# 测试与工具缓存
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# 本地数据：真实对话、内部文档、索引文件一律不入库
+.history/
+data/
+*.sqlite
+*.sqlite3
+*.db
+chroma/
+.qdrant/
+
+# 演示与媒体（体积大，走 Releases 或外部存储）
+*.gif
+*.mp4
+
+# 编辑器与系统
+.idea/
+.vscode/
+.DS_Store
